@@ -1,0 +1,240 @@
+﻿@page "/purchaseOrders"
+
+@inject IPurchaseOrderService PurchaseOrderService
+@inject IVendorService VendorService
+@inject IItemService ItemService
+
+<h3>PurchaseOrders</h3>
+
+<EditForm Model="@model" FormName="PurchaseOrder">
+    <DataAnnotationsValidator/>
+    <ValidationSummary/>
+    <div class="form-control">
+        <div class="row">
+            <div class="mb-2">
+                <label>
+                    Document No:
+                    <InputText @bind-Value="model.DocNo"></InputText>
+                </label>
+                <button class="btn btn-outline-primary" @onclick="@(() => GetPO(model.DocNo))">Get PO</button>
+            </div>
+
+        </div>
+
+        <div class="row">
+            <div class="mb-2">
+                <label>
+                    Document Date:
+                    <InputDate @bind-Value="model.DocDate"></InputDate>
+                </label>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="mb-2">
+                <label>
+                    Vendor:
+                    <InputSelect @bind-Value="model.VendorCode">
+                        <option value="">Select</option>
+                        @foreach (var vendor in vendors)
+                        {
+                            <option value="@vendor.Code">@vendor.Name</option>
+                        }
+                    </InputSelect>
+                </label>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="mb-2">
+                <label>
+                    Comment:
+                    <InputTextArea @bind-Value="model.Comment"></InputTextArea>
+                </label>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="mb-0">
+                <label>
+                    Remarks:
+                    <InputTextArea @bind-Value="model.Remarks"></InputTextArea>
+                </label>
+            </div>
+        </div>
+    </div>
+    
+
+    <table class="table table-bordered mt-2">
+        <thead>
+            <tr>
+                <th>S No.</th>
+                <th>Item Name</th>
+                <th>Unit</th>
+                <th>Quantity</th>
+                <th>Rate</th>
+                <th>Amount</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (model.PO_Items != null)
+            {
+                @foreach (var row in model.PO_Items)
+                {
+                    <tr>
+                        <td>@row.SNo</td>
+                        <td>
+                            <InputSelect @bind-Value="row.ItemCode">
+                                <option value="">Select</option>
+                                @foreach (var item in items)
+                                {
+                                    <option value="@item.Code">@item.Name</option>
+                                }
+                            </InputSelect>
+                        </td>
+                        <td>
+                            <InputSelect @bind-Value="row.Unit">
+                                <option value="">Select</option>
+                                @foreach (var item in items)
+                                {
+                                    <option value="@item.Unit">@item.Unit</option>
+                                }
+                            </InputSelect>
+                        </td>
+                        <td>
+                            <InputNumber @bind-Value="@row.Quantity" @oninput="e => QuantityChanged(e, row)"></InputNumber>
+                        </td>
+                        <td>
+                            <InputSelect @bind-Value="row.Rate" @onchange="e => RateChanged(e, row)">
+                                @foreach (var item in items)
+                                {
+                                    <option value="@item.Rate">@item.Rate</option>
+                                }
+                            </InputSelect>
+                        </td>
+                        <td>
+                            <InputNumber @bind-Value="row.Amount"></InputNumber>
+                        </td>
+                        <td>
+                            <button class="btn btn-primary" @onclick="() => AddRow()">Add</button><button class="btn btn-danger" @onclick="() => RemoveRow(row)">Rem</button>
+                        </td>
+                    </tr>
+                }
+            }                       
+        </tbody>
+        <tfoot>
+            <tr>
+                <td></td>
+                <td></td>
+                <td>Total</td>
+                <td>@model.TotalQty</td>
+                <td></td>
+                <td>@model.TotalAmt</td>
+                <td></td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <div style="text-align:end">
+        <span>
+            <button class="btn btn-primary" @onclick="FormSubmit" type="submit">Save</button>
+            <button class="btn btn-danger" @onclick="DeleteForm" >Delete</button>
+        </span>
+    </div>
+</EditForm>
+
+@code {
+    PurchaseOrderVM model = new PurchaseOrderVM();
+
+    private IEnumerable<PurchaseOrderVM> purchaseOrders = new List<PurchaseOrderVM>();
+    private IEnumerable<Vendor> vendors = new List<Vendor>();
+    private IEnumerable<Item> items = new List<Item>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // purchaseOrders = await PurchaseOrderService.GetAllPurchaseOrders();
+        vendors = await VendorService.GetAllVendors();
+        items = await ItemService.GetAllItems();
+
+        model.PO_Items = new List<Row>();
+
+        model.PO_Items.Add(new Row());
+    }
+
+    private async Task FormSubmit()
+    {
+        var isPOExists = await PurchaseOrderService.CheckIfPurchaseOrderExists(model.DocNo);
+
+        if(isPOExists)
+        {
+            var response = await PurchaseOrderService.UpdatePurchaseOrder(model);
+
+        }
+        else
+        {
+            var response = await PurchaseOrderService.CreatePurchaseOrder(model);
+
+            if (response.IsSuccessStatusCode)
+            {
+                model = new PurchaseOrderVM();
+                await OnInitializedAsync();
+            }            
+        }
+    }
+
+    private async Task GetPO(string po)
+    {
+        var response = await PurchaseOrderService.GetPurchaseOrder(po);
+
+        model = response;
+    }
+
+    private async Task DeleteForm()
+    {
+        var response = await PurchaseOrderService.DeletePurchaseOrder(model.DocNo);
+
+        if (response.IsSuccessStatusCode)
+        {
+            model = new PurchaseOrderVM();
+        }
+    }
+
+    private void QuantityChanged(ChangeEventArgs e, Row row)
+    {
+        row.Amount = int.Parse(e.Value.ToString()) * row.Rate;
+        CalculateTotals();
+    }
+
+    private void RateChanged(ChangeEventArgs e, Row row)
+    {
+        row.Amount = row.Quantity * int.Parse(e.Value.ToString());
+        CalculateTotals();
+    }
+
+    private void AddRow()
+    {
+        var newRow = new Row { SNo = model.PO_Items.Count + 1 };
+        model.PO_Items.Add(newRow);
+        CalculateTotals();
+    }
+
+    private void RemoveRow(Row row)
+    {
+        if (model.PO_Items.Count > 1)
+        {
+            model.PO_Items.Remove(row);
+            for (int i = 0; i < model.PO_Items.Count; i++)
+            {
+                model.PO_Items[i].SNo = i + 1;
+            }
+            CalculateTotals();
+        }
+    }
+
+    private void CalculateTotals()
+    {
+        model.TotalQty = 1 + model.PO_Items.Sum(r => r.Quantity);
+        model.TotalAmt = model.PO_Items.Sum(r => r.Amount);
+    }
+}

@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "New Profile",
+    "Projects": [
+      {
+        "Name": "PurchaseOrderMgmtWebApi\\PurchaseOrderMgmtWebApi.csproj",
+        "Action": "Start"
+      },
+      {
+        "Name": "PurchaseOrderMgmtBlazorWasm\\PurchaseOrderMgmtBlazorWasm.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]
